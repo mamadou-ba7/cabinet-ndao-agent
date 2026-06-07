@@ -1,0 +1,12 @@
+# Secrets — NE JAMAIS commiter
+.env
+credentials.json
+token.json
+.pkce_verifier
+*.download
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/

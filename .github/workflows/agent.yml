@@ -1,0 +1,43 @@
+name: Agent Email Cabinet NDAO
+
+on:
+  schedule:
+    # Toutes les 30 minutes (heure UTC). GitHub peut décaler de quelques minutes.
+    - cron: "*/30 * * * *"
+  workflow_dispatch: {}   # permet aussi de lancer manuellement via le bouton "Run workflow"
+
+# Évite que deux exécutions tournent en même temps
+concurrency:
+  group: agent-email
+  cancel-in-progress: false
+
+jobs:
+  run-agent:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+
+      - name: Installer Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Installer les dépendances
+        run: pip install -r requirements.txt
+
+      - name: Reconstituer les identifiants Gmail (depuis les secrets)
+        run: |
+          printf '%s' "${{ secrets.GMAIL_CREDENTIALS_B64 }}" | base64 -d > credentials.json
+          printf '%s' "${{ secrets.GMAIL_TOKEN_B64 }}" | base64 -d > token.json
+
+      - name: Lancer l'agent (mode brouillon)
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GROQ_MODEL: llama-3.3-70b-versatile
+          REPONSE_MODE: draft
+          GMAIL_LABEL: INBOX
+        # --marquer-lu : chaque email n'est traité qu'UNE fois (sinon doublons à chaque run)
+        run: python main.py --max 10 --marquer-lu
