@@ -28,6 +28,25 @@ MOTS_CLES_URGENCE = [
     "saisie", "contrainte",
 ]
 
+# Indices d'expéditeur automatique / notification de service → ne JAMAIS répondre.
+# Un humain qui écrit au cabinet n'utilise pas ces adresses.
+EXPEDITEURS_AUTOMATIQUES = [
+    "no-reply", "noreply", "no_reply", "ne-pas-repondre", "nepasrepondre",
+    "donotreply", "do-not-reply",
+    "notifications@", "notification@", "notify@",
+    "mailer-daemon", "postmaster@", "bounce", "bounces@",
+    "newsletter", "news@", "info@", "support@", "hello@", "team@",
+    "billing@", "invoice@", "receipts@", "receipt@",
+    "updates@", "update@", "alerts@", "alert@", "marketing@",
+    "account@", "accounts@", "noreply.", "automated",
+]
+
+
+def _est_expediteur_automatique(expediteur: str) -> bool:
+    """True si l'email vient d'un robot/service (aucune réponse à rédiger)."""
+    e = (expediteur or "").lower()
+    return any(indice in e for indice in EXPEDITEURS_AUTOMATIQUES)
+
 SYSTEM_PROMPT = """Tu es l'assistant virtuel du Cabinet Étude C.A. NDAO — Maître Cheikh Ahmed Tidiane NDAO, Avocat à la Cour à Dakar, Sénégal. Spécialités : droit des affaires, droit des sociétés, droit pénal des affaires.
 
 ━━━ IDENTITÉ ━━━
@@ -50,7 +69,11 @@ DEMANDE_SIMPLE    : réponse automatique autorisée (accusé de réception basiq
 RENDEZ_VOUS       : proposer des créneaux uniquement, sans confirmer
 DEMANDE_SENSIBLE  : transmettre à l'avocat, ne pas répondre
 URGENCE           : alerte immédiate, AUCUNE réponse automatique
-SPAM              : ignorer
+SPAM              : ignorer — inclut TOUTES les notifications automatiques, newsletters,
+                    publicités, factures de services en ligne, e-mails d'expéditeurs
+                    « no-reply / notifications / support / billing ». On ne répond JAMAIS
+                    à un robot ou à un service. Seul un humain qui sollicite réellement
+                    le cabinet mérite une réponse.
 
 ━━━ DISPONIBILITÉS RDV ━━━
 Jours       : Lundi à Jeudi
@@ -229,6 +252,15 @@ def analyser_email(email: dict, sauvegarder_supabase: bool = True) -> dict:
                 f"⚠️ Mots-clés urgence détectés : {', '.join(urgence_detectee)}"
             )
 
+    # Sécurité : expéditeur automatique (no-reply, notifications, newsletters…)
+    # → SPAM, jamais de réponse. On ne répond pas à un robot.
+    if _est_expediteur_automatique(email.get("from", "")) and not urgence_detectee:
+        classification["categorie"] = "SPAM"
+        classification["peut_repondre_automatiquement"] = False
+        classification["label_gmail"] = "Cabinet/Spam"
+        if not classification.get("note_pour_avocat"):
+            classification["note_pour_avocat"] = "Expéditeur automatique (notification/service)"
+
     categorie = classification["categorie"]
 
     # Sauvegarde Supabase (email + classification)
@@ -303,9 +335,17 @@ def analyser_email(email: dict, sauvegarder_supabase: bool = True) -> dict:
     messages.append({
         "role": "user",
         "content": (
-            f"Rédige la réponse pour la catégorie {categorie}.{contexte_supplementaire}\n"
-            "Rappels : vouvoiement obligatoire | aucun conseil juridique | "
-            "signature officielle complète en fin de message."
+            f"Rédige la réponse pour la catégorie {categorie}.{contexte_supplementaire}\n\n"
+            "EXIGENCES DE PERSONNALISATION (très important) :\n"
+            "1. Commence par t'adresser à la personne par son nom si tu le connais "
+            "(sinon « Madame, Monsieur, »).\n"
+            "2. Reformule en UNE phrase ce que la personne demande précisément, "
+            "pour montrer que son message a été lu et compris.\n"
+            "3. Réponds de façon adaptée à SA demande concrète (pas un texte générique "
+            "réutilisable pour n'importe quel email).\n"
+            "4. Termine par une formule de politesse + la signature officielle complète.\n\n"
+            "Rappels stricts : vouvoiement obligatoire | aucun conseil ni analyse juridique | "
+            "ne jamais promettre de résultat | ne jamais confirmer qu'une personne est cliente."
         ),
     })
 
