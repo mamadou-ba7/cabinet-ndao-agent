@@ -22,7 +22,7 @@ MAX = int(os.getenv("DEMO_MAX", "5"))
 
 
 def analyser_resilient(email):
-    """Analyse avec gestion de la limite gratuite Groq (réessai une fois)."""
+    """Analyse avec gestion d'une éventuelle limite de débit API (réessai une fois)."""
     try:
         return analyser_email(email, sauvegarder_supabase=False)
     except Exception as e:

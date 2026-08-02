@@ -13,9 +13,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-if not os.getenv("GROQ_API_KEY") or "VOTRE_CLE" in os.getenv("GROQ_API_KEY", ""):
-    print("❌ Ajoute ta vraie clé GROQ_API_KEY dans le fichier .env d'abord.")
-    print("   (obtenir GRATUITEMENT sur https://console.groq.com/keys)")
+_cle = os.getenv("AI_API_KEY") or os.getenv("GEMINI_API_KEY", "")
+if not _cle or "COLLE-TA-CLE" in _cle:
+    print("❌ Ajoute ta vraie clé AI_API_KEY dans le fichier .env d'abord.")
+    print("   (clé Gemini GRATUITE sur https://aistudio.google.com/apikey)")
     raise SystemExit(1)
 
 from email_agent import analyser_email

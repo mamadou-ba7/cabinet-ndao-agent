@@ -21,9 +21,28 @@ def get_supabase() -> Client:
     return _client
 
 
+def _extraire_adresse(expediteur: str) -> str:
+    """Extrait juste l'adresse email d'un en-tête « Nom <adresse@ex.com> »."""
+    e = (expediteur or "").strip()
+    if "<" in e and ">" in e:
+        e = e.split("<", 1)[1].split(">", 1)[0]
+    return e.strip().lower()
+
+
+def _trouver_client_id(expediteur: str) -> str | None:
+    """Cherche une fiche client dont l'email correspond à l'expéditeur."""
+    adresse = _extraire_adresse(expediteur)
+    if not adresse:
+        return None
+    sb = get_supabase()
+    result = sb.table("clients").select("id").ilike("email", adresse).limit(1).execute()
+    return result.data[0]["id"] if result.data else None
+
+
 def sauvegarder_email(email: dict, classification: dict) -> str:
     """
     Insère ou met à jour un email dans la table `emails`.
+    Relie automatiquement l'email à une fiche client si l'adresse correspond.
     Retourne l'UUID de la ligne Supabase.
     """
     sb = get_supabase()
@@ -42,6 +61,7 @@ def sauvegarder_email(email: dict, classification: dict) -> str:
         "note_pour_avocat": classification.get("note_pour_avocat", ""),
         "label_gmail": classification.get("label_gmail", ""),
         "statut": "en_attente",
+        "client_id": _trouver_client_id(email["from"]),
     }
     result = (
         sb.table("emails")

@@ -1,10 +1,19 @@
 import os
 import json
 from datetime import datetime, timedelta
-from groq import Groq
+from openai import OpenAI
 
-client = Groq()  # lit la clé depuis la variable d'environnement GROQ_API_KEY
-MODELE = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+# ── Fournisseur d'IA interchangeable (compatible OpenAI) ──────────────────────
+# Par défaut : Gemini GRATUIT. Pour passer à Claude plus tard, il suffit de
+# changer AI_BASE_URL / AI_API_KEY / AI_MODEL dans le .env — aucun code à toucher.
+#   Gemini  : https://generativelanguage.googleapis.com/v1beta/openai/  | gemini-2.0-flash
+#   Claude  : https://api.anthropic.com/v1/                             | claude-sonnet-4-6
+#   Groq    : https://api.groq.com/openai/v1                            | llama-3.3-70b-versatile
+AI_BASE_URL = os.getenv("AI_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai/")
+AI_API_KEY = os.getenv("AI_API_KEY") or os.getenv("GEMINI_API_KEY", "")
+MODELE = os.getenv("AI_MODEL", "gemini-2.0-flash")
+
+client = OpenAI(base_url=AI_BASE_URL, api_key=AI_API_KEY)
 
 SIGNATURE = (
     "\n\nVotre bien dévoué,\n\n"

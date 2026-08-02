@@ -35,9 +35,12 @@ jobs:
 
       - name: Lancer l'agent (mode brouillon)
         env:
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          GROQ_MODEL: llama-3.3-70b-versatile
+          AI_BASE_URL: https://openrouter.ai/api/v1
+          AI_API_KEY: ${{ secrets.AI_API_KEY }}
+          AI_MODEL: nvidia/nemotron-3-super-120b-a12b:free
           REPONSE_MODE: draft
           GMAIL_LABEL: INBOX
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         # --marquer-lu : chaque email n'est traité qu'UNE fois (sinon doublons à chaque run)
         run: python main.py --max 10 --marquer-lu
