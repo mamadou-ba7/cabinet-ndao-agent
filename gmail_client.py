@@ -1,5 +1,6 @@
 import os
 import base64
+import html
 import json
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -60,7 +61,7 @@ def get_email_details(service, msg_id):
         "subject": headers.get("Subject", "(Sans objet)"),
         "date": headers.get("Date", ""),
         "body": body,
-        "snippet": msg.get("snippet", ""),
+        "snippet": html.unescape(msg.get("snippet", "")),
     }
 
 
@@ -73,7 +74,9 @@ def _extract_body(payload):
                 body += base64.urlsafe_b64decode(data).decode("utf-8", errors="ignore")
     elif payload["body"].get("data"):
         body = base64.urlsafe_b64decode(payload["body"]["data"]).decode("utf-8", errors="ignore")
-    return body.strip()
+    # Certains clients mail génèrent un texte brut avec des entités HTML
+    # (ex: &#39; pour une apostrophe) — on les décode pour un affichage propre.
+    return html.unescape(body.strip())
 
 
 def create_draft(service, to, subject, body_text, thread_id=None):
