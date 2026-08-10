@@ -1,5 +1,6 @@
 import os
 import re
+import html
 import json
 from openai import OpenAI
 from parametres_agent import charger_parametres, liste, construire_system_prompt, proposer_creneaux
@@ -225,8 +226,12 @@ def analyser_email(email: dict, sauvegarder_supabase: bool = True) -> dict:
 
     # ── Étape 2 : Rédaction de la réponse ────────────────────────────────────
     creneaux_rdv = proposer_creneaux(valeurs) if categorie == "RENDEZ_VOUS" else ""
+    # Seule exception au format court : une demande de RDV, où l'on propose les
+    # créneaux configurés dans les Réglages (sans jamais confirmer le rendez-vous).
     contexte_supplementaire = (
-        f"\n\nCréneaux disponibles à proposer dans la réponse :\n{creneaux_rdv}"
+        "\n\nEXCEPTION pour cette demande de rendez-vous : après la phrase d'accusé "
+        "de réception, propose ces créneaux tels quels, sans confirmer le rendez-vous "
+        f"(« sous réserve de confirmation »). N'ajoute rien d'autre.\n{creneaux_rdv}"
         if creneaux_rdv else ""
     )
 
@@ -252,17 +257,13 @@ def analyser_email(email: dict, sauvegarder_supabase: bool = True) -> dict:
     messages.append({
         "role": "user",
         "content": (
-            f"Rédige la réponse pour la catégorie {categorie}.{contexte_supplementaire}\n\n"
-            "EXIGENCES DE PERSONNALISATION (très important) :\n"
-            "1. Commence par t'adresser à la personne par son nom si tu le connais "
-            "(sinon « Madame, Monsieur, »).\n"
-            "2. Reformule en UNE phrase ce que la personne demande précisément, "
-            "pour montrer que son message a été lu et compris.\n"
-            "3. Réponds de façon adaptée à SA demande concrète (pas un texte générique "
-            "réutilisable pour n'importe quel email).\n"
-            "4. Termine par une formule de politesse + la signature officielle complète.\n\n"
-            "Rappels stricts : vouvoiement obligatoire | aucun conseil ni analyse juridique | "
-            "ne jamais promettre de résultat | ne jamais confirmer qu'une personne est cliente."
+            f"Rédige l'accusé de réception pour la catégorie {categorie}."
+            f"{contexte_supplementaire}\n\n"
+            "Applique strictement la structure imposée. Choisis la formule d'appel "
+            "d'après l'expéditeur (client ou confrère).\n\n"
+            "Rappels : n'écris RIEN sur le contenu de sa demande, ne la résume pas et "
+            "ne la reformule pas | vouvoiement | 2 à 4 lignes | termine par la formule "
+            "de politesse et la signature officielle complète."
         ),
     })
 
@@ -281,12 +282,15 @@ def analyser_email(email: dict, sauvegarder_supabase: bool = True) -> dict:
             break
 
     # Filet de sécurité : certains modèles ignorent la consigne "texte brut" et
-    # renvoient des balises HTML (<br>…) — on les nettoie avant de créer le brouillon Gmail.
+    # renvoient des balises HTML (<br>…) ou des entités (&#39;). Le brouillon Gmail
+    # part en text/plain — sans nettoyage, le client reçoit le balisage tel quel.
     if reponse_redigee and reponse_redigee.get("corps_email"):
         corps = reponse_redigee["corps_email"]
         corps = re.sub(r"<br\s*/?>", "\n", corps, flags=re.IGNORECASE)
-        corps = re.sub(r"</?p>", "\n", corps, flags=re.IGNORECASE)
+        corps = re.sub(r"</?p\s*/?>", "\n", corps, flags=re.IGNORECASE)
         corps = re.sub(r"<[^>]+>", "", corps)
+        corps = html.unescape(corps)
+        corps = re.sub(r"\n{3,}", "\n\n", corps)
         reponse_redigee["corps_email"] = corps.strip()
 
     # Sauvegarde du brouillon dans Supabase
