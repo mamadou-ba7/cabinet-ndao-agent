@@ -2,6 +2,7 @@
 Paramètres de l'agent, entièrement configurables par le cabinet depuis le
 tableau de bord (table Supabase `settings`) — plus rien n'est figé dans le code.
 """
+import re
 from datetime import datetime, timedelta
 
 JOURS_FR = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"]
@@ -86,6 +87,25 @@ def construire_signature(valeurs: dict) -> str:
     return "\n".join(lignes)
 
 
+# Marqueurs de fin de lettre : tout ce qui suit est une signature (celle du
+# cabinet ou une formule inventée par le modèle) et sera remplacé par le bloc officiel.
+_FIN_DE_LETTRE = re.compile(
+    r"\n\s*(Votre bien dévoué|Je vous prie d'agréer|Veuillez agréer|Veuillez croire|"
+    r"Bien cordialement|Cordialement|Sincères salutations|Salutations distinguées)",
+    re.IGNORECASE,
+)
+
+
+def garantir_signature(texte: str, signature: str) -> str:
+    """Le prompt exige la signature, mais un modèle l'omet parfois, en invente une
+    autre, ou fait les deux — or un email d'avocat parti sans ses coordonnées est un
+    vrai défaut côté client. On coupe à la fin de lettre et on réappose le bloc
+    officiel : le résultat est toujours identique, et la fonction est idempotente."""
+    m = _FIN_DE_LETTRE.search(texte)
+    corps = texte[: m.start()] if m else texte
+    return f"{corps.strip()}\n\n{signature}"
+
+
 def construire_system_prompt(valeurs: dict) -> str:
     heure_debut = valeurs["rdv_heure_debut"].replace(":", "h")
     heure_fin = valeurs["rdv_heure_fin"].replace(":", "h")
@@ -118,16 +138,22 @@ Si doute → accuser réception uniquement, sans entrer dans le fond.
 2. Annoncer un retour :
    • par défaut : « dans les meilleurs délais »
    • si l'expéditeur mentionne explicitement une urgence ou une échéance : indiquer un délai cohérent, en restant prudent, sans engagement ferme
-3. Formule de politesse, puis la signature officielle complète
+3. Reproduire ensuite le bloc de signature officiel ci-dessous INTÉGRALEMENT et TEL QUEL,
+   de « Votre bien dévoué, » jusqu'à la dernière ligne d'adresse.
+   ⚠️ Ce bloc contient DÉJÀ la formule de politesse : n'en ajoute aucune autre
+   (pas de « Veuillez agréer… », pas de « Cordialement »).
+   ⚠️ Une réponse sans ce bloc complet est invalide.
 
 Ton : formel, sobre, impersonnel. Pas de chaleur excessive, pas de familiarité.
 
-Exemple attendu (client, sans urgence) :
+Exemple complet attendu (client, sans urgence) :
 Monsieur,
 
 J'accuse bonne réception de votre message et vous remercie de l'attention portée à ce dossier. Je vous reviendrai dans les meilleurs délais.
 
-Exemple attendu (confrère) :
+[ICI, le bloc de signature officiel reproduit intégralement, tel qu'indiqué plus bas]
+
+Autre début possible (confrère) — la fin reste toujours le bloc de signature :
 Cher Confrère,
 
 J'accuse bonne réception de votre correspondance. Je vous reviendrai dans les meilleurs délais.

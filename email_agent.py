@@ -3,7 +3,10 @@ import re
 import html
 import json
 from openai import OpenAI
-from parametres_agent import charger_parametres, liste, construire_system_prompt, proposer_creneaux
+from parametres_agent import (
+    charger_parametres, liste, construire_system_prompt, proposer_creneaux,
+    construire_signature, garantir_signature,
+)
 
 # ── Fournisseur d'IA interchangeable (compatible OpenAI) ──────────────────────
 # Par défaut : Gemini GRATUIT. Pour passer à Claude plus tard, il suffit de
@@ -291,7 +294,8 @@ def analyser_email(email: dict, sauvegarder_supabase: bool = True) -> dict:
         corps = re.sub(r"<[^>]+>", "", corps)
         corps = html.unescape(corps)
         corps = re.sub(r"\n{3,}", "\n\n", corps)
-        reponse_redigee["corps_email"] = corps.strip()
+        corps = garantir_signature(corps.strip(), construire_signature(valeurs))
+        reponse_redigee["corps_email"] = corps
 
     # Sauvegarde du brouillon dans Supabase
     if _supabase_ok and reponse_redigee and email_uuid:
