@@ -98,6 +98,49 @@ TOOLS = [
 ]
 
 
+def _appeler_outil(messages, nom_outil, max_tokens, tentatives=3):
+    """Appelle l'IA en forçant un outil, avec reprises.
+
+    Le modèle gratuit consomme parfois tout son budget de tokens en raisonnement
+    et termine sur finish_reason="length" sans jamais émettre l'appel d'outil ;
+    le fournisseur peut aussi renvoyer une charge d'erreur sans `choices`.
+    Sans reprise, l'email concerné était perdu (marqué lu, jamais classé).
+    Retourne (message, arguments_parsés, tool_call_id) ou (None, None, None).
+    """
+    for essai in range(tentatives):
+        try:
+            reponse = client.chat.completions.create(
+                model=MODELE,
+                max_tokens=max_tokens,
+                tools=TOOLS,
+                tool_choice={"type": "function", "function": {"name": nom_outil}},
+                messages=messages,
+            )
+        except Exception as e:
+            print(f"⚠️  Appel IA échoué ({nom_outil}, essai {essai + 1}/{tentatives}) : {e}")
+            continue
+
+        choix = getattr(reponse, "choices", None)
+        if not choix:
+            print(f"⚠️  Réponse IA sans résultat ({nom_outil}, essai {essai + 1}/{tentatives})")
+            continue
+
+        message = choix[0].message
+        for tc in (message.tool_calls or []):
+            if tc.function.name == nom_outil:
+                try:
+                    return message, json.loads(tc.function.arguments), tc.id
+                except json.JSONDecodeError:
+                    print(f"⚠️  Arguments illisibles ({nom_outil}, essai {essai + 1}/{tentatives})")
+                    break
+        else:
+            raison = getattr(choix[0], "finish_reason", "?")
+            print(f"⚠️  Pas d'appel d'outil ({nom_outil}, finish_reason={raison}, "
+                  f"essai {essai + 1}/{tentatives})")
+
+    return None, None, None
+
+
 def analyser_email(email: dict, sauvegarder_supabase: bool = True) -> dict:
     """Pipeline complet : classification → sécurité → rédaction → Supabase si activé."""
     try:
@@ -142,22 +185,11 @@ def analyser_email(email: dict, sauvegarder_supabase: bool = True) -> dict:
         },
     ]
 
-    response = client.chat.completions.create(
-        model=MODELE,
-        max_tokens=1024,
-        tools=TOOLS,
-        tool_choice={"type": "function", "function": {"name": "classifier_email"}},
-        messages=messages,
+    # Budget large : ce modèle raisonne longuement avant d'émettre l'appel d'outil,
+    # et un budget trop court le faisait terminer en finish_reason="length" sans classer.
+    message1, classification, tool_use_id = _appeler_outil(
+        messages, "classifier_email", max_tokens=3000
     )
-
-    message1 = response.choices[0].message
-    classification = None
-    tool_use_id = None
-    for tc in (message1.tool_calls or []):
-        if tc.function.name == "classifier_email":
-            classification = json.loads(tc.function.arguments)
-            tool_use_id = tc.id
-            break
 
     if not classification:
         return {"erreur": "Impossible de classifier l'email"}
@@ -270,19 +302,7 @@ def analyser_email(email: dict, sauvegarder_supabase: bool = True) -> dict:
         ),
     })
 
-    response2 = client.chat.completions.create(
-        model=MODELE,
-        max_tokens=2048,
-        tools=TOOLS,
-        tool_choice={"type": "function", "function": {"name": "rediger_reponse"}},
-        messages=messages,
-    )
-
-    reponse_redigee = None
-    for tc in (response2.choices[0].message.tool_calls or []):
-        if tc.function.name == "rediger_reponse":
-            reponse_redigee = json.loads(tc.function.arguments)
-            break
+    _, reponse_redigee, _ = _appeler_outil(messages, "rediger_reponse", max_tokens=3000)
 
     # Filet de sécurité : certains modèles ignorent la consigne "texte brut" et
     # renvoient des balises HTML (<br>…) ou des entités (&#39;). Le brouillon Gmail

@@ -89,8 +89,11 @@ def construire_signature(valeurs: dict) -> str:
 
 # Marqueurs de fin de lettre : tout ce qui suit est une signature (celle du
 # cabinet ou une formule inventée par le modèle) et sera remplacé par le bloc officiel.
+# \s+ (et non \n) : le modèle renvoie parfois toute la réponse sur une seule
+# ligne, séparée par des espaces — le marqueur doit être reconnu dans ce cas aussi,
+# sinon une seconde signature était ajoutée en doublon.
 _FIN_DE_LETTRE = re.compile(
-    r"\n\s*(Votre bien dévoué|Je vous prie d'agréer|Veuillez agréer|Veuillez croire|"
+    r"\s+(Votre bien dévoué|Je vous prie d'agréer|Veuillez agréer|Veuillez croire|"
     r"Bien cordialement|Cordialement|Sincères salutations|Salutations distinguées)",
     re.IGNORECASE,
 )

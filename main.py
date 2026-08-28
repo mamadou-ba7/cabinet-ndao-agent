@@ -133,9 +133,16 @@ def traiter_emails(max_emails: int = 10, marquer_lu: bool = False):
         else:
             print(f"\n⏭️  Action : {action}")
 
+        # On ne marque comme lu QUE si l'email a bien été classifié : sinon un
+        # échec passager de l'IA le ferait disparaître de la boîte sans qu'il
+        # soit jamais traité ni visible dans le tableau de bord. Non marqué, il
+        # sera repris au prochain passage.
         if marquer_lu:
-            mark_as_read(service, email["id"])
-            print("✅ Marqué comme lu.")
+            if classification:
+                mark_as_read(service, email["id"])
+                print("✅ Marqué comme lu.")
+            else:
+                print("↩️  Laissé non lu (classification échouée) — repris au prochain passage.")
 
         sep()
 
