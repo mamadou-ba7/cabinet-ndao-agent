@@ -12,11 +12,10 @@ load_dotenv()
 
 from gmail_client import (
     get_gmail_service, get_unread_emails,
-    create_draft, send_email, mark_as_read, add_label
+    create_draft, mark_as_read, add_label
 )
 from email_agent import analyser_email
 
-REPONSE_MODE = os.getenv("REPONSE_MODE", "draft")
 GMAIL_LABEL = os.getenv("GMAIL_LABEL", "INBOX")
 
 
@@ -108,26 +107,19 @@ def traiter_emails(max_emails: int = 10, marquer_lu: bool = False):
             print("─" * 40)
             print(reponse["corps_email"])
             print("─" * 40)
+            # L'agent ne PEUT PAS envoyer : il ne crée que des brouillons.
+            # Un email ne part qu'après relecture et validation explicite de
+            # l'avocat, depuis le tableau de bord ou depuis Gmail.
             try:
-                if REPONSE_MODE == "auto":
-                    sid = send_email(
-                        service,
-                        to=email["from"],
-                        subject=email["subject"],
-                        body_text=reponse["corps_email"],
-                        thread_id=email["thread_id"],
-                    )
-                    print(f"\n📤 Envoyé automatiquement (ID: {sid})")
-                else:
-                    did = create_draft(
-                        service,
-                        to=email["from"],
-                        subject=email["subject"],
-                        body_text=reponse["corps_email"],
-                        thread_id=email["thread_id"],
-                    )
-                    print(f"\n💾 Brouillon créé dans Gmail (ID: {did})")
-                    print("   → À vérifier et envoyer depuis Gmail.")
+                did = create_draft(
+                    service,
+                    to=email["from"],
+                    subject=email["subject"],
+                    body_text=reponse["corps_email"],
+                    thread_id=email["thread_id"],
+                )
+                print(f"\n💾 Brouillon créé dans Gmail (ID: {did})")
+                print("   → À valider depuis le tableau de bord ou Gmail. Aucun envoi automatique.")
             except Exception as e:
                 print(f"\n❌ Erreur : {e}")
         else:
@@ -162,18 +154,13 @@ def main():
     parser = argparse.ArgumentParser(description="Agent Email — Cabinet NDAO")
     parser.add_argument("--max", type=int, default=10, help="Nombre max d'emails à traiter")
     parser.add_argument("--marquer-lu", action="store_true", help="Marquer les emails traités comme lus")
-    parser.add_argument("--mode", choices=["draft", "auto"], help="Override du mode d'envoi")
     args = parser.parse_args()
 
-    if args.mode:
-        os.environ["REPONSE_MODE"] = args.mode
-        global REPONSE_MODE
-        REPONSE_MODE = args.mode
 
     print("=" * 60)
     print("   AGENT EMAIL — CABINET ÉTUDE C.A. NDAO")
     print("   Maître Cheikh Ahmed Tidiane NDAO | Dakar")
-    print(f"   Mode : {'Brouillons (validation avocat)' if REPONSE_MODE == 'draft' else '⚠️  Envoi automatique'}")
+    print("   Mode : Brouillons uniquement — aucun envoi automatique possible")
     print("=" * 60)
     print()
 
