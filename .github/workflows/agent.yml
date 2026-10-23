@@ -37,7 +37,7 @@ jobs:
         env:
           AI_BASE_URL: https://cabinet-ndao-ai.openai.azure.com/openai/v1
           AI_API_KEY: ${{ secrets.AI_API_KEY }}
-          AI_MODEL: kimi-k26
+          AI_MODEL: gpt-oss-120b
           GMAIL_LABEL: INBOX
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
