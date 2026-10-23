@@ -41,5 +41,5 @@ jobs:
           GMAIL_LABEL: INBOX
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-        # --marquer-lu : chaque email n'est traité qu'UNE fois (sinon doublons à chaque run)
-        run: python main.py --max 10 --marquer-lu
+        # Chaque email n'est traité qu'une fois : on ignore ceux déjà enregistrés (gmail_id), sans les marquer « lus »
+        run: python main.py --max 10

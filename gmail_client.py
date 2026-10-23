@@ -49,6 +49,15 @@ def get_unread_emails(service, max_results=10, label="INBOX"):
     return emails
 
 
+def get_recent_email_ids(service, max_results=30, label="INBOX", query="newer_than:3d"):
+    """IDs des emails récents de la boîte, lus ou non (l'agent ne dépend plus du statut « non lu »,
+    que Maître NDAO peut changer en ouvrant ses emails sur son téléphone)."""
+    result = service.users().messages().list(
+        userId="me", labelIds=[label], q=query, maxResults=max_results,
+    ).execute()
+    return [m["id"] for m in result.get("messages", [])]
+
+
 def get_email_details(service, msg_id):
     msg = service.users().messages().get(userId="me", id=msg_id, format="full").execute()
     headers = {h["name"]: h["value"] for h in msg["payload"]["headers"]}

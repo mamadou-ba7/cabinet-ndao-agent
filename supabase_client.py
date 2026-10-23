@@ -92,3 +92,12 @@ def sauvegarder_brouillon(email_uuid: str, corps_email: str) -> str:
 def marquer_email_urgent(email_uuid: str) -> None:
     """Passe le statut de l'email à 'urgent' dans Supabase."""
     get_supabase().table("emails").update({"statut": "urgent"}).eq("id", email_uuid).execute()
+
+
+def gmail_ids_deja_traites(gmail_ids: list) -> set:
+    """Parmi ces identifiants Gmail, ceux déjà enregistrés dans la table `emails`."""
+    if not gmail_ids:
+        return set()
+    sb = get_supabase()
+    rows = sb.table("emails").select("gmail_id").in_("gmail_id", gmail_ids).execute().data or []
+    return {r["gmail_id"] for r in rows}

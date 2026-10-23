@@ -11,10 +11,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from gmail_client import (
-    get_gmail_service, get_unread_emails,
+    get_gmail_service, get_unread_emails, get_recent_email_ids, get_email_details,
     create_draft, mark_as_read, add_label
 )
 from email_agent import analyser_email
+from supabase_client import gmail_ids_deja_traites
 
 GMAIL_LABEL = os.getenv("GMAIL_LABEL", "INBOX")
 
@@ -44,11 +45,14 @@ def traiter_emails(max_emails: int = 10, marquer_lu: bool = False):
     service = get_gmail_service()
     print("✅ Connecté.\n")
 
-    print(f"📬 Récupération des emails non lus ({GMAIL_LABEL})...")
-    emails = get_unread_emails(service, max_results=max_emails, label=GMAIL_LABEL)
+    print(f"📬 Recherche des nouveaux emails ({GMAIL_LABEL}, 3 derniers jours)...")
+    ids = get_recent_email_ids(service, max_results=50, label=GMAIL_LABEL)
+    deja = gmail_ids_deja_traites(ids)
+    nouveaux = [i for i in ids if i not in deja][:max_emails]
+    emails = [e for e in (get_email_details(service, i) for i in nouveaux) if e]
 
     if not emails:
-        print("✨ Aucun email non lu.")
+        print("✨ Aucun nouvel email.")
         return
 
     print(f"📧 {len(emails)} email(s) à traiter.\n")
