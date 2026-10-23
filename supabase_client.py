@@ -39,6 +39,15 @@ def _trouver_client_id(expediteur: str) -> str | None:
     return result.data[0]["id"] if result.data else None
 
 
+def _date_iso(valeur: str):
+    """Convertit une date d'en-tête email (« Fri, 23 Oct 2026 10:16:52 +0000 (UTC) ») en ISO 8601."""
+    from email.utils import parsedate_to_datetime
+    try:
+        return parsedate_to_datetime(valeur).isoformat()
+    except (TypeError, ValueError):
+        return None
+
+
 def sauvegarder_email(email: dict, classification: dict) -> str:
     """
     Insère ou met à jour un email dans la table `emails`.
@@ -51,7 +60,7 @@ def sauvegarder_email(email: dict, classification: dict) -> str:
         "thread_id": email.get("thread_id", ""),
         "from_address": email["from"],
         "subject": email["subject"],
-        "date": email["date"],
+        "date": _date_iso(email["date"]),
         "snippet": email.get("snippet", ""),
         "body": email.get("body", ""),
         "categorie": classification.get("categorie", ""),
